@@ -1,6 +1,7 @@
 import json
 import os
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +11,7 @@ from app.learning import propose
 from app.models import Outcome, ScreeningConfig, StockSnapshot
 from app.scoring import score
 from app.storage import Store
+from app.providers.alpaca import AlpacaConfigurationError, AlpacaMarketData
 
 app = FastAPI(title="AI Stock Researcher", version="0.1.0", description="Research-only decision support; no brokerage execution.")
 store = Store(os.getenv("DATABASE_PATH", "data/researcher.db"))
@@ -22,6 +24,19 @@ def home(): return FileResponse("static/index.html")
 
 @app.get("/api/health")
 def health(): return {"status": "ok", "mode": "demo", "brokerage_execution": False}
+
+
+@app.get("/api/providers/alpaca/status")
+def alpaca_status():
+    try:
+        provider = AlpacaMarketData()
+        symbols = provider.active_us_symbols()
+        provider.close()
+        return {"configured": True, "authenticated": True, "active_us_symbols": len(symbols), "orders_enabled": False}
+    except AlpacaConfigurationError:
+        return {"configured": False, "authenticated": False, "active_us_symbols": 0, "orders_enabled": False}
+    except httpx.HTTPError as exc:
+        return {"configured": True, "authenticated": False, "active_us_symbols": 0, "orders_enabled": False, "error": type(exc).__name__}
 
 
 @app.get("/api/config")
