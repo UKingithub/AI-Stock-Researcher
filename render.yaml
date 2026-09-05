@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ai-stock-researcher
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_PATH
+        value: /tmp/researcher.db
+      - key: APCA_API_KEY_ID
+        sync: false
+      - key: APCA_API_SECRET_KEY
+        sync: false
+      - key: SEC_USER_AGENT
+        sync: false
+
