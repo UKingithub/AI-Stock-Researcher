@@ -8,15 +8,18 @@ from pydantic import BaseModel, Field, model_validator
 
 class ScreeningConfig(BaseModel):
     rsi_min: float = Field(50, ge=0, le=100)
-    rsi_max: float = Field(65, ge=0, le=100)
+    rsi_max: float = Field(70, ge=0, le=100)
     adx_min: float = Field(20, ge=0)
-    rvol_min: float = Field(1.5, ge=0)
-    atr_pct_min: float = Field(2, ge=0)
-    atr_pct_max: float = Field(4.5, ge=0)
-    revenue_growth_min: float = 15
+    rvol_min: float = Field(0, ge=0)
+    atr_pct_min: float = Field(0, ge=0)
+    atr_pct_max: float = Field(100, ge=0)
+    average_volume_30d_min: float = Field(500_000, ge=0)
+    roc_9_min: float = 0
+    net_margin_min: float = 0
+    revenue_growth_min: float = 5
     eps_growth_min: float = 15
     roic_min: float = 10
-    debt_to_equity_max: float = Field(1.5, ge=0)
+    debt_to_equity_max: float = Field(2, ge=0)
     insider_purchase_min: float = Field(100_000, ge=0)
     accumulating_institutions_min: int = Field(3, ge=0)
     technical_weight: float = Field(.30, ge=0)
@@ -44,6 +47,9 @@ class StockSnapshot(BaseModel):
     adx: float
     rvol: float
     atr_pct: float
+    average_volume_30d: float = 0
+    roc_9: float = 0
+    net_margin: float = 0
     revenue_growth: float
     eps_growth: float
     roic: float
@@ -84,5 +90,4 @@ class LearningProposal(BaseModel):
     sample_size: int
     message: str
     proposed_weights: dict[str, float] | None = None
-
 
