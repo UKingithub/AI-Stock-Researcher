@@ -1,0 +1,68 @@
+import json
+import os
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from app.demo import snapshots
+from app.learning import propose
+from app.models import Outcome, ScreeningConfig, StockSnapshot
+from app.scoring import score
+from app.storage import Store
+
+app = FastAPI(title="AI Stock Researcher", version="0.1.0", description="Research-only decision support; no brokerage execution.")
+store = Store(os.getenv("DATABASE_PATH", "data/researcher.db"))
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/")
+def home(): return FileResponse("static/index.html")
+
+
+@app.get("/api/health")
+def health(): return {"status": "ok", "mode": "demo", "brokerage_execution": False}
+
+
+@app.get("/api/config")
+def get_config(): return store.get_config()
+
+
+@app.put("/api/config")
+def put_config(config: ScreeningConfig):
+    store.save_config(config)
+    return config
+
+
+@app.post("/api/score")
+def score_one(snapshot: StockSnapshot): return score(snapshot, store.get_config())
+
+
+@app.post("/api/scan")
+def scan_demo():
+    config = store.get_config()
+    ranked = []
+    for snapshot in snapshots():
+        result = score(snapshot, config)
+        if result.eligible:
+            rid = store.add_recommendation(snapshot, result)
+            ranked.append({"id": rid, "ticker": snapshot.ticker, "price": snapshot.price, "score": result})
+    return sorted(ranked, key=lambda x: x["score"].total, reverse=True)[:5]
+
+
+@app.get("/api/recommendations")
+def recommendations():
+    return [{**r, "scores": json.loads(r["scores"])} for r in store.recent()]
+
+
+@app.post("/api/outcomes")
+def add_outcome(outcome: Outcome):
+    try: store.add_outcome(outcome)
+    except ValueError as exc: raise HTTPException(404, str(exc)) from exc
+    return {"status": "recorded"}
+
+
+@app.get("/api/learning/proposal")
+def learning_proposal(): return propose(store.outcome_rows())
+
+
