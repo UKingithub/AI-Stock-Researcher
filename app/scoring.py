@@ -13,6 +13,11 @@ def score(snapshot: StockSnapshot, config: ScreeningConfig) -> ScoreBreakdown:
     trend = snapshot.price > snapshot.ema20 > snapshot.ema50 > snapshot.ema200
     rsi_ok = config.rsi_min <= snapshot.rsi <= config.rsi_max
     atr_ok = config.atr_pct_min <= snapshot.atr_pct <= config.atr_pct_max
+    volume_ok = snapshot.average_volume_30d > config.average_volume_30d_min
+    roc_ok = snapshot.roc_9 > config.roc_9_min
+    margin_ok = snapshot.net_margin > config.net_margin_min
+    revenue_ok = snapshot.revenue_growth > config.revenue_growth_min
+    debt_ok = snapshot.debt_to_equity < config.debt_to_equity_max
     technical = 100 * sum([
         0.35 if trend else 0,
         0.20 if rsi_ok else 0,
@@ -32,10 +37,14 @@ def score(snapshot: StockSnapshot, config: ScreeningConfig) -> ScoreBreakdown:
     if rsi_ok: reasons.append("RSI is inside the configured range")
     if snapshot.adx >= config.adx_min: reasons.append("ADX confirms trend strength")
     if snapshot.rvol >= config.rvol_min: reasons.append("Relative volume passes threshold")
+    if volume_ok: reasons.append("30-day average volume exceeds configured minimum")
+    if roc_ok: reasons.append("ROC(9) is positive")
+    if margin_ok: reasons.append("Annual net margin is positive")
+    if revenue_ok: reasons.append("TTM revenue growth passes threshold")
+    if debt_ok: reasons.append("Quarterly debt/equity is below maximum")
     if snapshot.institutional_accumulators >= config.accumulating_institutions_min: reasons.append("Institutional accumulation passes threshold")
     if snapshot.insider_open_market_purchase_usd >= config.insider_purchase_min: reasons.append("Material open-market insider purchase")
     total = technical * config.technical_weight + fundamental * config.fundamental_weight + institutional * config.institutional_weight + insider * config.insider_weight
-    eligible = trend and rsi_ok and atr_ok and snapshot.adx >= config.adx_min and snapshot.rvol >= config.rvol_min
+    eligible = trend and rsi_ok and atr_ok and volume_ok and roc_ok and margin_ok and revenue_ok and debt_ok and snapshot.adx > config.adx_min and snapshot.rvol >= config.rvol_min
     return ScoreBreakdown(technical=round(technical, 1), fundamental=round(fundamental, 1), institutional=round(institutional, 1), insider=round(insider, 1), total=round(total, 1), eligible=eligible, reasons=reasons)
-
 
