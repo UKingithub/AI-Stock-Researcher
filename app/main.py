@@ -40,14 +40,24 @@ def score_one(snapshot: StockSnapshot): return score(snapshot, store.get_config(
 
 @app.post("/api/scan")
 def scan_demo():
+    return rank_and_store(snapshots())
+
+
+def rank_and_store(universe: list[StockSnapshot]):
     config = store.get_config()
     ranked = []
-    for snapshot in snapshots():
+    for snapshot in universe:
         result = score(snapshot, config)
         if result.eligible:
             rid = store.add_recommendation(snapshot, result)
             ranked.append({"id": rid, "ticker": snapshot.ticker, "price": snapshot.price, "score": result})
     return sorted(ranked, key=lambda x: x["score"].total, reverse=True)[:5]
+
+
+@app.post("/api/scan/snapshots")
+def scan_snapshots(universe: list[StockSnapshot]):
+    """Score timestamped snapshots supplied by a licensed market-data collector."""
+    return rank_and_store(universe)
 
 
 @app.get("/api/recommendations")
@@ -64,5 +74,4 @@ def add_outcome(outcome: Outcome):
 
 @app.get("/api/learning/proposal")
 def learning_proposal(): return propose(store.outcome_rows())
-
 
