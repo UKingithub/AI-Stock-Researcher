@@ -59,3 +59,5 @@ Open `http://localhost:8000`. The MVP defaults to demo mode; no API key is neede
 
 Add provider adapters behind `StockSnapshot`: SEC EDGAR (filings/Form 4/13D/13G), a licensed market/fundamentals feed, calendar-aware event risk, and price-history-derived multi-timeframe indicators. Provider failures and data timestamps should remain explicit; missing evidence must never be silently scored as bullish.
 
+The Alpaca read-only adapter is included. Configure `APCA_API_KEY_ID` and `APCA_API_SECRET_KEY` only as private server environment variables. The adapter retrieves the active US-equity universe and adjusted daily bars; it deliberately provides no order-submission method.
+
