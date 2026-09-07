@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -35,6 +36,22 @@ class CatalystAssessment(BaseModel):
     market_confirmation: float = Field(ge=-1, le=1)
     reasons: list[str]
     caution: str | None = None
+
+
+class CatalystEvent(BaseModel):
+    ticker: str
+    item: NewsItem
+    event_price: float = Field(gt=0)
+    market: MarketConfirmation | None = None
+    surprise_impact: float = Field(0, ge=-1, le=1)
+    market_regime: str = "unknown"
+    observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CatalystOutcome(BaseModel):
+    event_id: int
+    horizon_days: Literal[1, 5, 20]
+    exit_price: float = Field(gt=0)
 
 
 SOURCE_CREDIBILITY = {
