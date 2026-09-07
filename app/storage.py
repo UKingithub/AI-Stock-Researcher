@@ -2,6 +2,7 @@ import json
 import sqlite3
 from pathlib import Path
 
+from app.catalyst import CatalystAssessment, CatalystEvent, CatalystOutcome
 from app.models import Outcome, ScreeningConfig, StockSnapshot
 
 
@@ -31,6 +32,17 @@ class Store:
             CREATE TABLE IF NOT EXISTS learning_proposals (
               id INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT NOT NULL,
               status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS catalyst_events (
+              id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT NOT NULL,
+              event_price REAL NOT NULL, item TEXT NOT NULL, market TEXT,
+              assessment TEXT NOT NULL, market_regime TEXT NOT NULL,
+              observed_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS catalyst_outcomes (
+              id INTEGER PRIMARY KEY AUTOINCREMENT, event_id INTEGER NOT NULL,
+              horizon_days INTEGER NOT NULL CHECK(horizon_days IN (1,5,20)),
+              exit_price REAL NOT NULL, return_pct REAL NOT NULL,
+              UNIQUE(event_id,horizon_days),
+              FOREIGN KEY(event_id) REFERENCES catalyst_events(id));
             """)
             db.execute("INSERT OR IGNORE INTO settings(id,payload) VALUES(1,?)", (ScreeningConfig().model_dump_json(),))
 
@@ -63,5 +75,37 @@ class Store:
     def recent(self, limit=50):
         with self.connect() as db:
             return [dict(r) for r in db.execute("SELECT id,ticker,entry_price,scores,created_at FROM recommendations ORDER BY id DESC LIMIT ?", (limit,))]
+
+    def add_catalyst_event(self, event: CatalystEvent, assessment: CatalystAssessment) -> int:
+        with self.connect() as db:
+            cur = db.execute(
+                "INSERT INTO catalyst_events(ticker,event_price,item,market,assessment,market_regime,observed_at) VALUES(?,?,?,?,?,?,?)",
+                (event.ticker.upper(), event.event_price, event.item.model_dump_json(),
+                 event.market.model_dump_json() if event.market else None,
+                 assessment.model_dump_json(), event.market_regime, event.observed_at.isoformat()),
+            )
+            return cur.lastrowid
+
+    def add_catalyst_outcome(self, outcome: CatalystOutcome) -> float:
+        with self.connect() as db:
+            row = db.execute("SELECT event_price FROM catalyst_events WHERE id=?", (outcome.event_id,)).fetchone()
+            if not row:
+                raise ValueError("catalyst event not found")
+            return_pct = (outcome.exit_price / row[0] - 1) * 100
+            db.execute(
+                "INSERT OR REPLACE INTO catalyst_outcomes(event_id,horizon_days,exit_price,return_pct) VALUES(?,?,?,?)",
+                (outcome.event_id, outcome.horizon_days, outcome.exit_price, return_pct),
+            )
+            return return_pct
+
+    def catalyst_evidence(self):
+        with self.connect() as db:
+            rows = db.execute("""
+                SELECT e.id,e.ticker,e.assessment,e.market_regime,e.observed_at,
+                       o.horizon_days,o.exit_price,o.return_pct
+                FROM catalyst_events e LEFT JOIN catalyst_outcomes o ON o.event_id=e.id
+                ORDER BY e.id DESC,o.horizon_days
+            """)
+            return [dict(row) for row in rows]
 
 
