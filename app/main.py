@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.catalyst import MarketConfirmation, NewsItem, assess_catalyst
+from app.catalyst import CatalystEvent, CatalystOutcome, MarketConfirmation, NewsItem, assess_catalyst
 from app.demo import snapshots
 from app.learning import propose
 from app.models import Outcome, ScreeningConfig, StockSnapshot
@@ -58,6 +58,28 @@ def catalyst_assess(item: NewsItem, surprise_impact: float = 0.0):
 @app.post("/api/catalyst/assess-with-market")
 def catalyst_assess_with_market(item: NewsItem, market: MarketConfirmation, surprise_impact: float = 0.0):
     return assess_catalyst(item, market=market, surprise_impact=surprise_impact)
+
+
+@app.post("/api/catalyst/events")
+def record_catalyst_event(event: CatalystEvent):
+    assessment = assess_catalyst(event.item, event.market, event.surprise_impact)
+    event_id = store.add_catalyst_event(event, assessment)
+    return {"id": event_id, "assessment": assessment}
+
+
+@app.post("/api/catalyst/outcomes")
+def record_catalyst_outcome(outcome: CatalystOutcome):
+    try:
+        return_pct = store.add_catalyst_outcome(outcome)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return {"status": "recorded", "return_pct": return_pct}
+
+
+@app.get("/api/catalyst/evidence")
+def catalyst_evidence():
+    rows = store.catalyst_evidence()
+    return [{**row, "assessment": json.loads(row["assessment"])} for row in rows]
 
 
 @app.get("/api/config")
