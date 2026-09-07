@@ -1,3 +1,5 @@
+import pytest
+
 from app.catalyst import CatalystEvent, CatalystOutcome, NewsItem, assess_catalyst
 from app.storage import Store
 
@@ -17,7 +19,7 @@ def test_catalyst_event_and_forward_returns_are_persisted(tmp_path):
     event_id = store.add_catalyst_event(catalyst_event, assess_catalyst(catalyst_event.item))
     result = store.add_catalyst_outcome(CatalystOutcome(event_id=event_id, horizon_days=5, exit_price=108))
 
-    assert result == 8
+    assert result == pytest.approx(8)
     evidence = store.catalyst_evidence()
     assert evidence[0]["ticker"] == "ABC"
     assert evidence[0]["horizon_days"] == 5
