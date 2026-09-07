@@ -54,6 +54,9 @@ Open `http://localhost:8000`. The MVP defaults to demo mode; no API key is neede
 - `GET /api/recommendations`
 - `POST /api/outcomes` for 5/10-day observations
 - `GET /api/learning/proposal`
+- `POST /api/catalyst/events` to persist an assessed catalyst at its observed price
+- `POST /api/catalyst/outcomes` for 1/5/20-trading-day forward returns
+- `GET /api/catalyst/evidence` to export the calibration evidence
 
 ## Next data-integration milestone
 
