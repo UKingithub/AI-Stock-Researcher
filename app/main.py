@@ -6,16 +6,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.catalyst import MarketConfirmation, NewsItem, assess_catalyst
 from app.demo import snapshots
 from app.learning import propose
+from app.live_scan import scan_live
 from app.models import Outcome, ScreeningConfig, StockSnapshot
 from app.scoring import score
 from app.storage import Store
 from app.providers.alpaca import AlpacaConfigurationError, AlpacaMarketData
-from app.providers.news import FreeNewsProvider
 
-app = FastAPI(title="AI Stock Researcher", version="0.2.0", description="Research-only decision support; no brokerage execution.")
+app = FastAPI(title="AI Stock Researcher", version="0.1.0", description="Research-only decision support; no brokerage execution.")
 store = Store(os.getenv("DATABASE_PATH", "data/researcher.db"))
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -25,7 +24,7 @@ def home(): return FileResponse("static/index.html")
 
 
 @app.get("/api/health")
-def health(): return {"status": "ok", "mode": "demo", "brokerage_execution": False, "catalyst_engine": True}
+def health(): return {"status": "ok", "mode": "demo", "brokerage_execution": False}
 
 
 @app.get("/api/providers/alpaca/status")
@@ -39,25 +38,6 @@ def alpaca_status():
         return {"configured": False, "authenticated": False, "active_us_symbols": 0, "orders_enabled": False}
     except httpx.HTTPError as exc:
         return {"configured": True, "authenticated": False, "active_us_symbols": 0, "orders_enabled": False, "error": type(exc).__name__}
-
-
-@app.get("/api/news/{ticker}")
-def news(ticker: str, company_name: str | None = None, limit_per_source: int = 10):
-    provider = FreeNewsProvider()
-    try:
-        return provider.collect(ticker, company_name, min(max(limit_per_source, 1), 25))
-    finally:
-        provider.close()
-
-
-@app.post("/api/catalyst/assess")
-def catalyst_assess(item: NewsItem, surprise_impact: float = 0.0):
-    return assess_catalyst(item, surprise_impact=surprise_impact)
-
-
-@app.post("/api/catalyst/assess-with-market")
-def catalyst_assess_with_market(item: NewsItem, market: MarketConfirmation, surprise_impact: float = 0.0):
-    return assess_catalyst(item, market=market, surprise_impact=surprise_impact)
 
 
 @app.get("/api/config")
@@ -77,6 +57,17 @@ def score_one(snapshot: StockSnapshot): return score(snapshot, store.get_config(
 @app.post("/api/scan")
 def scan_demo():
     return rank_and_store(snapshots())
+
+
+@app.post("/api/scan/live")
+def live_scan():
+    """Run a read-only live technical screen; fundamentals are added separately."""
+    try:
+        return scan_live(store.get_config())
+    except AlpacaConfigurationError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, "Alpaca market-data request failed") from exc
 
 
 def rank_and_store(universe: list[StockSnapshot]):
