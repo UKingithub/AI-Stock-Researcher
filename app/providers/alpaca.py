@@ -38,7 +38,7 @@ class AlpacaMarketData:
             if asset.get("tradable") and asset.get("exchange") in {"NASDAQ", "NYSE", "AMEX", "ARCA", "BATS", "NYSEARCA"}
         )
 
-    def daily_bars(self, symbols: list[str], start: date, end: date, feed: str = "sip") -> dict[str, list[dict]]:
+    def daily_bars(self, symbols: list[str], start: date, end: date, feed: str = "iex") -> dict[str, list[dict]]:
         """Fetch adjusted daily OHLCV bars, following Alpaca pagination."""
         bars: dict[str, list[dict]] = {symbol: [] for symbol in symbols}
         page_token = None
@@ -61,5 +61,3 @@ class AlpacaMarketData:
 
     def close(self):
         self.client.close()
-
-
